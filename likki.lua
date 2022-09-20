@@ -1,3 +1,5 @@
+#!/usr/bin/env lua
+
 --- Split a string using `sep` as a delimiter.
 --- @param input string
 --- @param sep string
@@ -40,6 +42,7 @@ local buildpage = function(path)
 	local output = ''
 	local preformatted = false
 	local pagename = path:gsub('^%./site/', ''):gsub('%.gmi$', '')
+	local prevlinetype = nil
 
 	if not pagelinks[pagename] then
 		pagelinks[pagename] = {}
@@ -48,6 +51,8 @@ local buildpage = function(path)
 	for line in io.lines(path) do
 		-- Preformatted mode
 		if line:match('^```') then
+			prevlinetype = 'pre'
+
 			if preformatted then
 				output = output .. '</pre></code>\n'
 			else
@@ -56,19 +61,32 @@ local buildpage = function(path)
 
 			preformatted = not preformatted
 		elseif preformatted == true then
-			output = output .. escapehtml(line) .. '\n'
+			prevlinetype = 'pre'
+			output = output .. escapehtml(line)
 		-- H3
 		elseif line:match('^###') then
+			prevlinetype = 'heading'
 			output = output .. line:gsub('^###%s*(.+)', '<h3>%1</h3>\n')
 		-- H2
 		elseif line:match('^##') then
+			prevlinetype = 'heading'
 			output = output .. line:gsub('^##%s*(.+)', '<h2>%1</h2>\n')
 		-- H1
 		elseif line:match('^#') then
+			prevlinetype = 'heading'
 			output = output .. line:gsub('^#%s*(.+)', '<h1>%1</h1>\n')
 		-- Link
 		elseif line:match('^=>') then
+			prevlinetype = 'link'
 			output = output .. line:gsub('^=>%s+(%S+)%s(.+)', '<p><a href="%1">%2</a></p>\n')
+		-- Blockquote
+		elseif line:match('^>') then
+			if prevlinetype ~= 'blockquote' then
+				output = output .. '<blockquote>\n'
+			end
+
+			prevlinetype = 'blockquote'
+			output = output .. line:gsub('^>%s*(.+)', '%1\n')
 		-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 		else
 			local linkifiedline = line:gsub('%b{}', function(arg)
@@ -86,11 +104,17 @@ local buildpage = function(path)
 
 			-- List
 			if linkifiedline:match('^*') then
+				prevlinetype = 'list'
 				output = output .. linkifiedline:gsub('^*%s*(.+)', '<li>%1</li>\n')
 			-- Text
 			else
+				prevlinetype = 'text'
 				output = output .. string.format('<p>%s</p>\n', linkifiedline)
 			end
+		end
+
+		if prevlinetype ~= 'blockquote' then
+			output = output .. '</blockquote>\n'
 		end
 	end
 
@@ -119,7 +143,7 @@ for _, filename in pairs(splitstring(filelist, '\n')) do
 end
 
 -- Load the HTML template
-local templatefile = io.open('./site/template.html', 'r')
+local templatefile = io.open('./site/_template.html', 'r')
 assert(templatefile, 'No template.html')
 ---@type string
 local template = templatefile:read('a')
@@ -127,7 +151,7 @@ templatefile:close()
 
 --- Build an index page that lists every page in the wiki
 local createindex = function()
-	local output = '<h1>Index</h1>\n'
+	local output = ''
 
 	for pagename in pairs(parsedpages) do
 		output = output .. string.format('<li><a href="%s.html">%s</a></li>', pagename, pagename)
@@ -138,6 +162,12 @@ end
 
 parsedpages.index = createindex()
 pagelinks.index = {}
+
+local index = ''
+
+for pagename in pairs(parsedpages) do
+	index = index .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, pagename)
+end
 
 -- Apply the HTML template to each page and write the finished page to disk
 for pagename, pagehtml in pairs(parsedpages) do
@@ -161,7 +191,8 @@ for pagename, pagehtml in pairs(parsedpages) do
 
 	local wrappedpagecontents = template
 		:gsub('{{ title }}', pagename)
-		:gsub('{{ body }}', pagehtml)
+		:gsub('{{ index }}', function() return index end)
+		:gsub('{{ body }}', function() return pagehtml end)
 		:gsub('{{ backlinks }}', backlinkshtml)
 
 	file:write(wrappedpagecontents)
