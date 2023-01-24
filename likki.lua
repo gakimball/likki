@@ -56,29 +56,49 @@ local buildpage = function(path)
 			if preformatted then
 				output = output .. '</pre></code>\n'
 			else
-				output = output .. '<code><pre>\n'
+				output = output .. '<code><pre>'
 			end
 
 			preformatted = not preformatted
 		elseif preformatted == true then
 			prevlinetype = 'pre'
-			output = output .. escapehtml(line)
+			output = output .. escapehtml(line) .. '\n'
 		-- H3
 		elseif line:match('^###') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^###%s*(.+)', '<h3>%1</h3>\n')
+			output = output .. line:gsub('^###%s*(.+)', '<h4>%1</h3>\n')
 		-- H2
 		elseif line:match('^##') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^##%s*(.+)', '<h2>%1</h2>\n')
+			output = output .. line:gsub('^##%s*(.+)', '<h3>%1</h2>\n')
 		-- H1
 		elseif line:match('^#') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^#%s*(.+)', '<h1>%1</h1>\n')
+			output = output .. line:gsub('^#%s*(.+)', '<h2>%1</h1>\n')
 		-- Link
 		elseif line:match('^=>') then
 			prevlinetype = 'link'
-			output = output .. line:gsub('^=>%s+(%S+)%s(.+)', '<p><a href="%1">%2</a></p>\n')
+
+			local url = ''
+			local text = ''
+
+			if line:match('^=>%s+(%S+)%s(.+)') then
+				line:gsub('^=>%s+(%S+)%s(.+)', function(foundUrl, foundText)
+					url = foundUrl
+					text = foundText
+				end)
+			else
+				line:gsub('^=>%s+(%S+)', function(foundUrl)
+					url = foundUrl
+					text = foundUrl
+				end)
+			end
+
+			if url:match('%.jpg$') then
+				output = output .. string.format('<img src="%s" alt="%s">', url, text)
+			else
+				output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', url, text)
+			end
 		-- Blockquote
 		elseif line:match('^>') then
 			if prevlinetype ~= 'blockquote' then
@@ -113,7 +133,7 @@ local buildpage = function(path)
 			end
 		end
 
-		if prevlinetype ~= 'blockquote' then
+		if prevlinetype == 'blockquote' then
 			output = output .. '</blockquote>\n'
 		end
 	end
@@ -160,13 +180,13 @@ local createindex = function()
 	return output
 end
 
-parsedpages.index = createindex()
-pagelinks.index = {}
+parsedpages.directory = createindex()
+pagelinks.directory = {}
 
-local index = ''
+local directoryhtml = ''
 
 for pagename in pairs(parsedpages) do
-	index = index .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, pagename)
+	directoryhtml = directoryhtml .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, pagename)
 end
 
 -- Apply the HTML template to each page and write the finished page to disk
@@ -191,7 +211,7 @@ for pagename, pagehtml in pairs(parsedpages) do
 
 	local wrappedpagecontents = template
 		:gsub('{{ title }}', pagename)
-		:gsub('{{ index }}', function() return index end)
+		:gsub('{{ index }}', function() return directoryhtml end)
 		:gsub('{{ body }}', function() return pagehtml end)
 		:gsub('{{ backlinks }}', backlinkshtml)
 
