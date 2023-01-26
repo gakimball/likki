@@ -1,5 +1,11 @@
 #!/usr/bin/env lua
 
+--- @class Page
+--- @field title string Title of page.
+--- @field body string HTML of page.
+--- @field unlisted boolean Page is invisible.
+--- @field links string[] Outgoing links to other pages.
+
 --- Split a string using `sep` as a delimiter.
 --- @param input string
 --- @param sep string
@@ -26,27 +32,35 @@ local escapehtml = function(input)
 		:gsub('}', '&#125;')
 end
 
---- Convert a page title to its filename equivalent.
---- @param input string
-local slugify = function(input)
-	return input:gsub('%s', '_'):lower()
-end
+--- Check if a list-like table contains a value.
+--- @param list any[]
+--- @param value any
+local hasvalue = function(list, value)
+	for _, v in ipairs(list) do
+		if v == value then
+			return true
+		end
+	end
 
---- Mapping of page names to a list of pages that link to them.
---- @type { [string]: string[] }
-local pagelinks = {}
+	return false
+end
 
 --- Convert the Gemtext file at `path` to HTML, and make note of internal links to other pages.
 --- @param path string
 local buildpage = function(path)
 	local output = ''
 	local preformatted = false
-	local pagename = path:gsub('^%./site/', ''):gsub('%.gmi$', '')
+	local filename = path:gsub('^%./site/', '')
+	local pagename = filename:gsub('^_', ''):gsub('%.gmi$', '')
 	local prevlinetype = nil
 
-	if not pagelinks[pagename] then
-		pagelinks[pagename] = {}
-	end
+	--- @type Page
+	local page = {
+		title = pagename:gsub('-', ' '),
+		body = '',
+		unlisted = filename:match('^_') ~= nil,
+		links = {},
+	}
 
 	for line in io.lines(path) do
 		-- Preformatted mode
@@ -110,14 +124,12 @@ local buildpage = function(path)
 		-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 		else
 			local linkifiedline = line:gsub('%b{}', function(arg)
-				local title = arg:gsub('^{', ''):gsub('}$', '')
-				local href = slugify(title)
+				local title = arg:gsub('^{(.*)}$', '%1')
+				local href = title:gsub('%s', '-'):lower()
 
-				if not pagelinks[href] then
-					pagelinks[href] = {}
+				if not hasvalue(page.links, href) then
+					table.insert(page.links, href)
 				end
-
-				table.insert(pagelinks[href], pagename)
 
 				return string.format('<a href="%s.html">%s</a>', href, title)
 			end)
@@ -138,7 +150,9 @@ local buildpage = function(path)
 		end
 	end
 
-	return output
+	page.body = output
+
+	return pagename, page
 end
 
 -- Get all pages
@@ -151,15 +165,15 @@ lscmd:close()
 -- Create the build folder
 os.execute('mkdir ./build')
 
---- Mapping of page names to their HTML contents.
---- @type { [string]: string }
-local parsedpages = {}
+--- Mapping of page filenames to the page's metadata.
+--- @type { [string]: Page }
+local pages = {}
 
 -- Convert each page from Gemtext to HTML
 for _, filename in pairs(splitstring(filelist, '\n')) do
-	local pagename = filename:gsub('^%./site/(.+)%.gmi', '%1')
+	local pagename, page = buildpage(filename)
 
-	parsedpages[pagename] = buildpage(filename)
+	pages[pagename] = page
 end
 
 -- Load the HTML template
@@ -169,51 +183,47 @@ assert(templatefile, 'No template.html')
 local template = templatefile:read('a')
 templatefile:close()
 
---- Build an index page that lists every page in the wiki
-local createindex = function()
-	local output = ''
+-- Add an index page that lists every page in the wiki
+pages.directory = {
+	title = 'Directory',
+	unlisted = false,
+	body = (function()
+		local output = ''
 
-	for pagename in pairs(parsedpages) do
-		output = output .. string.format('<li><a href="%s.html">%s</a></li>', pagename, pagename)
-	end
+		for pagename, page in pairs(pages) do
+			output = output .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, page.title)
+		end
 
-	return output
-end
-
-parsedpages.directory = createindex()
-pagelinks.directory = {}
-
-local directoryhtml = ''
-
-for pagename in pairs(parsedpages) do
-	directoryhtml = directoryhtml .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, pagename)
-end
+		return output
+	end)(),
+	links = {},
+}
 
 -- Apply the HTML template to each page and write the finished page to disk
-for pagename, pagehtml in pairs(parsedpages) do
+for pagename, page in pairs(pages) do
 	local pagepath = './build/' .. pagename .. '.html'
 	local file = io.open(pagepath, 'w')
 
 	assert(file, 'Could not open ' .. pagepath)
 
-	local backlinkshtml = ''
-
-	-- Append backlinks
-	if #pagelinks[pagename] > 0 then
-		backlinkshtml = backlinkshtml .. '<h2>Backlinks</h2>\n'
-
-		for _, backlink in ipairs(pagelinks[pagename]) do
-			local listtemplate = '<li><a href="%s.html">%s</a></li>\n'
-
-			backlinkshtml = backlinkshtml .. listtemplate:format(backlink, backlink)
-		end
-	end
-
 	local wrappedpagecontents = template
-		:gsub('{{ title }}', pagename)
-		:gsub('{{ index }}', function() return directoryhtml end)
-		:gsub('{{ body }}', function() return pagehtml end)
-		:gsub('{{ backlinks }}', backlinkshtml)
+		:gsub('{{ title }}', function() return page.title end)
+		:gsub('{{ body }}', function() return page.body end)
+		:gsub('{{ backlinks }}', function()
+			local output = ''
+
+			for otherpagename, otherpage in pairs(pages) do
+				if hasvalue(otherpage.links, pagename) then
+					output = output .. string.format('<li><a href="%s">%s</a></li>\n', otherpagename, otherpage.title)
+				end
+			end
+
+			if #output > 0 then
+				output = '<h2>Backlinks</h2>\n' .. output
+			end
+
+			return output
+		end)
 
 	file:write(wrappedpagecontents)
 	file:close()
