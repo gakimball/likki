@@ -3,8 +3,14 @@
 --- @class Page
 --- @field title string Title of page.
 --- @field body string HTML of page.
+--- @field headings Heading[] Page headings.
 --- @field unlisted boolean Page is invisible.
 --- @field links string[] Outgoing links to other pages.
+
+--- @class Heading
+--- @field title string
+--- @field slug string
+--- @field level number
 
 --- Split a string using `sep` as a delimiter.
 --- @param input string
@@ -45,6 +51,11 @@ local hasvalue = function(list, value)
 	return false
 end
 
+--- @param title string
+local slugifytitle = function(title)
+	return title:gsub('%s', '-'):lower()
+end
+
 --- Convert the Gemtext file at `path` to HTML, and make note of internal links to other pages.
 --- @param path string
 local buildpage = function(path)
@@ -58,6 +69,7 @@ local buildpage = function(path)
 	local page = {
 		title = pagename:gsub('-', ' '),
 		body = '',
+		headings = {},
 		unlisted = filename:match('^_') ~= nil,
 		links = {},
 	}
@@ -80,15 +92,36 @@ local buildpage = function(path)
 		-- H3
 		elseif line:match('^###') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^###%s*(.+)', '<h4>%1</h3>\n')
+			local title = line:gsub('^###%s*', '')
+			local slug = slugifytitle(title)
+			output = output .. line:gsub('^###%s*(.+)', '<h4 id="%%s">%1</h3>\n'):format(slug)
+			table.insert(page.headings, {
+				title = title,
+				slug = slug,
+				level = 3,
+			})
 		-- H2
 		elseif line:match('^##') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^##%s*(.+)', '<h3>%1</h2>\n')
+			local title = line:gsub('^##%s*', '')
+			local slug = slugifytitle(title)
+			output = output .. line:gsub('^##%s*(.+)', '<h3 id="%%s">%1</h2>\n'):format(slug)
+			table.insert(page.headings, {
+				title = title,
+				slug = slug,
+				level = 2,
+			})
 		-- H1
 		elseif line:match('^#') then
 			prevlinetype = 'heading'
-			output = output .. line:gsub('^#%s*(.+)', '<h2>%1</h1>\n')
+			local title = line:gsub('^#%s*', '')
+			local slug = slugifytitle(title)
+			output = output .. line:gsub('^#%s*(.+)', '<h2 id="%%s">%1</h1>\n'):format(slug)
+			table.insert(page.headings, {
+				title = title,
+				slug = slug,
+				level = 1,
+			})
 		-- Link
 		elseif line:match('^=>') then
 			prevlinetype = 'link'
@@ -196,6 +229,7 @@ pages.directory = {
 
 		return output
 	end)(),
+	headings = {},
 	links = {},
 }
 
@@ -209,6 +243,15 @@ for pagename, page in pairs(pages) do
 	local wrappedpagecontents = template
 		:gsub('{{ title }}', function() return page.title end)
 		:gsub('{{ body }}', function() return page.body end)
+		:gsub('{{ outline }}', function()
+			local output = '<ul>'
+
+			for _, heading in ipairs(page.headings) do
+				output = output .. string.format('<li data-level="%s"><a href="#%s">%s</a></li>\n', heading.level, heading.slug, heading.title)
+			end
+
+			return output .. '</ul>'
+		end)
 		:gsub('{{ backlinks }}', function()
 			local output = ''
 
