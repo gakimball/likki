@@ -144,6 +144,10 @@ local buildpage = function(path)
 			if url:match('%.jpg$') then
 				output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', url, text)
 			else
+				if not url:match('://') and not hasvalue(page.links, url) then
+					table.insert(page.links, url)
+				end
+
 				output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', url, text)
 			end
 		-- Blockquote

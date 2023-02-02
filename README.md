@@ -22,5 +22,5 @@ Features:
 Issues:
 
 - [ ] Multi-line blockquotes do not work
-- [ ] Block-level (`=>`) internal links should count as backlinks
+- [x] Block-level (`=>`) internal links should count as backlinks
 - [ ] Private pages should not appear in directory or in backlinks
