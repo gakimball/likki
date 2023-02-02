@@ -142,7 +142,7 @@ local buildpage = function(path)
 			end
 
 			if url:match('%.jpg$') then
-				output = output .. string.format('<img src="%s" alt="%s">', url, text)
+				output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', url, text)
 			else
 				output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', url, text)
 			end
