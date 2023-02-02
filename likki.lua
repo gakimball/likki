@@ -189,6 +189,10 @@ local buildpage = function(path)
 
 	page.body = output
 
+	if page.unlisted then
+		page.links = {}
+	end
+
 	return pagename, page
 end
 
@@ -228,7 +232,9 @@ pages.directory = {
 		local output = ''
 
 		for pagename, page in pairs(pages) do
-			output = output .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, page.title)
+			if not page.unlisted then
+				output = output .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, page.title)
+			end
 		end
 
 		return output
