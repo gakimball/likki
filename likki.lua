@@ -15,6 +15,7 @@
 --- Split a string using `sep` as a delimiter.
 --- @param input string
 --- @param sep string
+--- @return string[]
 local splitstring = function(input, sep)
 	local fragments = {}
 
@@ -56,6 +57,26 @@ local slugifytitle = function(title)
 	return title:gsub('%s', '-'):lower()
 end
 
+--- @param input string
+local parseblocklink = function(input)
+	local href = ''
+	local text = ''
+
+	if input:match('^=>%s+(%S+)%s(.+)') then
+		input:gsub('^=>%s+(%S+)%s(.+)', function(foundUrl, foundText)
+			href = foundUrl
+			text = foundText
+		end)
+	else
+		input:gsub('^=>%s+(%S+)', function(foundUrl)
+			href = foundUrl
+			text = foundUrl
+		end)
+	end
+
+	return href, text
+end
+
 --- Convert the Gemtext file at `path` to HTML, and make note of internal links to other pages.
 --- @param path string
 local buildpage = function(path)
@@ -86,70 +107,9 @@ local buildpage = function(path)
 			end
 
 			preformatted = not preformatted
-		elseif preformatted == true then
+		elseif preformatted then
 			prevlinetype = 'pre'
 			output = output .. escapehtml(line) .. '\n'
-		-- H3
-		elseif line:match('^###') then
-			prevlinetype = 'heading'
-			local title = line:gsub('^###%s*', '')
-			local slug = slugifytitle(title)
-			output = output .. line:gsub('^###%s*(.+)', '<h4 id="%%s">%1</h3>\n'):format(slug)
-			table.insert(page.headings, {
-				title = title,
-				slug = slug,
-				level = 3,
-			})
-		-- H2
-		elseif line:match('^##') then
-			prevlinetype = 'heading'
-			local title = line:gsub('^##%s*', '')
-			local slug = slugifytitle(title)
-			output = output .. line:gsub('^##%s*(.+)', '<h3 id="%%s">%1</h2>\n'):format(slug)
-			table.insert(page.headings, {
-				title = title,
-				slug = slug,
-				level = 2,
-			})
-		-- H1
-		elseif line:match('^#') then
-			prevlinetype = 'heading'
-			local title = line:gsub('^#%s*', '')
-			local slug = slugifytitle(title)
-			output = output .. line:gsub('^#%s*(.+)', '<h2 id="%%s">%1</h1>\n'):format(slug)
-			table.insert(page.headings, {
-				title = title,
-				slug = slug,
-				level = 1,
-			})
-		-- Link
-		elseif line:match('^=>') then
-			prevlinetype = 'link'
-
-			local url = ''
-			local text = ''
-
-			if line:match('^=>%s+(%S+)%s(.+)') then
-				line:gsub('^=>%s+(%S+)%s(.+)', function(foundUrl, foundText)
-					url = foundUrl
-					text = foundText
-				end)
-			else
-				line:gsub('^=>%s+(%S+)', function(foundUrl)
-					url = foundUrl
-					text = foundUrl
-				end)
-			end
-
-			if url:match('%.jpg$') then
-				output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', url, text)
-			else
-				if not url:match('://') and not hasvalue(page.links, url) then
-					table.insert(page.links, url)
-				end
-
-				output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', url, text)
-			end
 		-- Blockquote
 		elseif line:match('^>') then
 			if prevlinetype ~= 'blockquote' then
@@ -158,32 +118,88 @@ local buildpage = function(path)
 
 			prevlinetype = 'blockquote'
 			output = output .. line:gsub('^>%s*(.+)', '%1\n')
-		-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 		else
-			local linkifiedline = line:gsub('%b{}', function(arg)
-				local title = arg:gsub('^{(.*)}$', '%1')
-				local href = title:gsub('%s', '-'):lower()
+			output = output .. '</blockquote>\n'
 
-				if not hasvalue(page.links, href) then
-					table.insert(page.links, href)
+			-- H3
+			if line:match('^###') then
+				prevlinetype = 'heading'
+				local title = line:gsub('^###%s*', '')
+				local slug = slugifytitle(title)
+				output = output .. line:gsub('^###%s*(.+)', '<h4 id="%%s">%1</h3>\n'):format(slug)
+				table.insert(page.headings, {
+					title = title,
+					slug = slug,
+					level = 3,
+				})
+				-- H2
+			elseif line:match('^##') then
+				prevlinetype = 'heading'
+				local title = line:gsub('^##%s*', '')
+				local slug = slugifytitle(title)
+				output = output .. line:gsub('^##%s*(.+)', '<h3 id="%%s">%1</h2>\n'):format(slug)
+				table.insert(page.headings, {
+					title = title,
+					slug = slug,
+					level = 2,
+				})
+				-- H1
+			elseif line:match('^#') then
+				prevlinetype = 'heading'
+				local title = line:gsub('^#%s*', '')
+				local slug = slugifytitle(title)
+				output = output .. line:gsub('^#%s*(.+)', '<h2 id="%%s">%1</h1>\n'):format(slug)
+				table.insert(page.headings, {
+					title = title,
+					slug = slug,
+					level = 1,
+				})
+				-- Link
+			elseif line:match('^=>') then
+				prevlinetype = 'link'
+				local href, text = parseblocklink(line)
+
+				if href:match('%.jpg$') then
+					output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', href, text)
+				else
+					if not href:match('://') and not hasvalue(page.links, href) then
+						table.insert(page.links, href)
+					end
+
+					output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', href, text)
+				end
+				-- Blockquote
+			elseif line:match('^>') then
+				if prevlinetype ~= 'blockquote' then
+					output = output .. '<blockquote>\n'
 				end
 
-				return string.format('<a href="%s.html">%s</a>', href, title)
-			end)
-
-			-- List
-			if linkifiedline:match('^*') then
-				prevlinetype = 'list'
-				output = output .. linkifiedline:gsub('^*%s*(.+)', '<li>%1</li>\n')
-			-- Text
+				prevlinetype = 'blockquote'
+				output = output .. line:gsub('^>%s*(.+)', '%1\n')
+				-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 			else
-				prevlinetype = 'text'
-				output = output .. string.format('<p>%s</p>\n', linkifiedline)
-			end
-		end
+				local linkifiedline = line:gsub('%b{}', function(arg)
+					local parsedinput = splitstring(arg:gsub('^{(.*)}$', '%1'), '|')
+					local href = slugifytitle(parsedinput[1])
+					local title = parsedinput[2] or parsedinput[1]
 
-		if prevlinetype == 'blockquote' then
-			output = output .. '</blockquote>\n'
+					if not hasvalue(page.links, href) then
+						table.insert(page.links, href)
+					end
+
+					return string.format('<a href="%s.html">%s</a>', href, title)
+				end)
+
+				-- List
+				if linkifiedline:match('^*') then
+					prevlinetype = 'list'
+					output = output .. linkifiedline:gsub('^*%s*(.+)', '<li>%1</li>\n')
+					-- Text
+				else
+					prevlinetype = 'text'
+					output = output .. string.format('<p>%s</p>\n', linkifiedline)
+				end
+			end
 		end
 	end
 
