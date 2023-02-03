@@ -26,6 +26,13 @@ local splitstring = function(input, sep)
 	return fragments
 end
 
+--- Remove leading and trailing whitespace from a string.
+--- @param input string
+local trimstring = function(input)
+  return input:gsub("^%s*(.-)%s*$", "%1")
+end
+
+
 --- Escape the HTML of a string.
 --- @param input string
 local escapehtml = function(input)
@@ -92,6 +99,29 @@ local parseheadingline = function(line)
 	}
 end
 
+--- Parse the cells of a table line.
+--- @param line string
+local parsetableline = function(line)
+	local cells = splitstring(line, '|')
+
+	for index, cell in ipairs(cells) do
+		cells[index] = trimstring(cell)
+	end
+
+	return cells
+end
+
+--- @param cells string[]
+local isdecorativerow = function(cells)
+	for _, cell in ipairs(cells) do
+		if not cell:match('^%-+$') then
+			return false
+		end
+	end
+
+	return true
+end
+
 --- Convert the Gemtext file at `path` to HTML, and make note of internal links to other pages.
 --- @param path string
 local buildpage = function(path)
@@ -134,58 +164,84 @@ local buildpage = function(path)
 			prevlinetype = 'blockquote'
 			output = output .. line:gsub('^>%s*(.+)', '%1\n')
 		else
-			output = output .. '</blockquote>\n'
+			if prevlinetype == 'blockquote' then
+				output = output .. '</blockquote>\n'
+			end
 
-			-- Heading
-			if line:match('^##?#?') then
-				prevlinetype = 'heading'
-				local heading = parseheadingline(line)
-				output = output .. line:gsub('^##?#?%s*(.+)', '<h%%s id="%%s">%1</h3>\n'):format(heading.level + 1, heading.slug)
-				table.insert(page.headings, heading)
-			-- Link
-			elseif line:match('^=>') then
-				prevlinetype = 'link'
-				local href, text = parseblocklink(line)
+			if line:match('^|') then
+				local element = 'td'
 
-				if href:match('%.jpg$') then
-					output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', href, text)
-				else
-					if not href:match('://') and not hasvalue(page.links, href) then
-						table.insert(page.links, href)
+				if prevlinetype ~= 'table' then
+					element = 'th'
+					output = output .. '<table>\n'
+				end
+
+				prevlinetype = 'table'
+				local cells = parsetableline(line)
+
+				if not isdecorativerow(cells) then
+					output = output .. '<tr>\n'
+					for _, cell in ipairs(cells) do
+						output = output .. string.format('<%s>%s</%s>\n', element, cell, element)
 					end
-
-					output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', href, text)
+					output = output .. '</tr>\n'
 				end
-			-- Blockquote
-			elseif line:match('^>') then
-				if prevlinetype ~= 'blockquote' then
-					output = output .. '<blockquote>\n'
-				end
-
-				prevlinetype = 'blockquote'
-				output = output .. line:gsub('^>%s*(.+)', '%1\n')
-			-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 			else
-				local linkifiedline = line:gsub('%b{}', function(arg)
-					local parsedinput = splitstring(arg:gsub('^{(.*)}$', '%1'), '|')
-					local href = slugifytitle(parsedinput[1])
-					local title = parsedinput[2] or parsedinput[1]
+				if prevlinetype == 'table' then
+					output = output .. '</table>\n'
+				end
 
-					if not hasvalue(page.links, href) then
-						table.insert(page.links, href)
+				-- Heading
+				if line:match('^##?#?') then
+					prevlinetype = 'heading'
+					local heading = parseheadingline(line)
+					output = output .. line:gsub('^##?#?%s*(.+)', '<h%%s id="%%s">%1</h3>\n'):format(heading.level + 1, heading.slug)
+					table.insert(page.headings, heading)
+					-- Link
+				elseif line:match('^=>') then
+					prevlinetype = 'link'
+					local href, text = parseblocklink(line)
+
+					if href:match('%.jpg$') then
+						output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', href, text)
+					else
+						if not href:match('://') and not hasvalue(page.links, href) then
+							table.insert(page.links, href)
+						end
+
+						output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', href, text)
+					end
+					-- Blockquote
+				elseif line:match('^>') then
+					if prevlinetype ~= 'blockquote' then
+						output = output .. '<blockquote>\n'
 					end
 
-					return string.format('<a href="%s.html">%s</a>', href, title)
-				end)
-
-				-- List
-				if linkifiedline:match('^*') then
-					prevlinetype = 'list'
-					output = output .. linkifiedline:gsub('^*%s*(.+)', '<li>%1</li>\n')
-				-- Plain line
+					prevlinetype = 'blockquote'
+					output = output .. line:gsub('^>%s*(.+)', '%1\n')
+					-- Remaining possible line types are lists or plain lines, which we parse for {internal links}
 				else
-					prevlinetype = 'text'
-					output = output .. string.format('<p>%s</p>\n', linkifiedline)
+					local linkifiedline = line:gsub('%b{}', function(arg)
+						local parsedinput = splitstring(arg:gsub('^{(.*)}$', '%1'), '|')
+						local href = slugifytitle(parsedinput[1])
+						local title = parsedinput[2] or parsedinput[1]
+
+						if not hasvalue(page.links, href) then
+							table.insert(page.links, href)
+						end
+
+						return string.format('<a href="%s.html">%s</a>', href, title)
+					end)
+
+					-- List
+					if linkifiedline:match('^*') then
+						prevlinetype = 'list'
+						output = output .. linkifiedline:gsub('^*%s*(.+)', '<li>%1</li>\n')
+						-- Plain line
+					else
+						prevlinetype = 'text'
+						output = output .. string.format('<p>%s</p>\n', linkifiedline)
+					end
 				end
 			end
 		end
@@ -285,3 +341,5 @@ for pagename, page in pairs(pages) do
 	file:write(wrappedpagecontents)
 	file:close()
 end
+
+print(string.format("Built in %.0fms", os.clock() * 1000))

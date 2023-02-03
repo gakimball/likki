@@ -18,7 +18,7 @@ Features:
 - [x] Adds backlinks to each page
 - [x] Produces an index (listing of all pages)
 - [x] Support custom link titles, e.g. `{san luis obispo|slo}`
-- [ ] Add Markdown-style tables
+- [x] Add Markdown-style tables
 
 Issues:
 
