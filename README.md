@@ -23,6 +23,7 @@ Run the script to build the wiki once:
 Relative to your current working directory, likki is looking for a `site` directory containing:
 
 - `_template.html`, the site template
+- `_navigation.txt`, a navigation template
 - Files with the `.gmi` extension, which are your wiki pages
 
 The finished site will be output to a `build` directory adjacent to `site`.
@@ -74,12 +75,27 @@ The file `site/_template.html` holds your HTML template. Use these template vari
 - `{{ body }}`: page contents
 - `{{ outline }}`: table of contents with links to each heading
 - `{{ backlinks }}`: list of other pages that link to this one
+- `{{ navigation }}`: main site navigation
 
 The infixed spaces are necessary, by the way!
 
+## Navigation
+
+The file `site/_navigation.txt` holds a template for use as the main site navigation. Each line starting with a hyphen is an internal link; all other lines are section titles.
+
+```
+section 1
+- page 1
+- page 2
+
+section 2
+- page 3
+- page 4
+```
+
 ## Backlinks
 
-likki tracks internal links between pages; you can insert a page's backlinks into your HTML template.
+likki tracks internal links between pages; you can insert a page's backlinks into your HTML template. On build, likki will print to the console any page that isn't linked to by another page or by the site navigation. Unlisted pages are excluded from this check.
 
 ## Directory
 

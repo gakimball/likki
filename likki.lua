@@ -256,6 +256,29 @@ local buildpage = function(path)
 	return pagename, page
 end
 
+local buildnavigation = function()
+	local output = ''
+	--- @type string[]
+	local navlinks = {}
+
+	for line in io.lines('./site/_navigation.txt') do
+		if not line:match('^%s*$') then
+			if line:match('^-') then
+				local title = line:gsub('^-%s+(.*)', '%1')
+				local href = slugifytitle(title)
+
+				table.insert(navlinks, href)
+
+				output = output .. string.format('<li><a href="%s.html">%s</a></li>', href, title)
+			else
+				output = output .. string.format('<p>%s</p>', line)
+			end
+		end
+	end
+
+	return output, navlinks
+end
+
 -- Get all pages
 local lscmd = io.popen('ls ./site/*.gmi')
 assert(lscmd, 'Could not run ls')
@@ -263,12 +286,19 @@ assert(lscmd, 'Could not run ls')
 local filelist = lscmd:read('a')
 lscmd:close()
 
+-- Get navigation
+local navigationhtml, navlinks = buildnavigation()
+
 -- Create the build folder
 os.execute('mkdir ./build')
 
 --- Mapping of page filenames to the page's metadata.
 --- @type { [string]: Page }
 local pages = {}
+
+--- List of pages with no backlinks.
+--- @type string[]
+local orphanedpages = {}
 
 -- Convert each page from Gemtext to HTML
 for _, filename in pairs(splitstring(filelist, '\n')) do
@@ -280,7 +310,7 @@ end
 -- Load the HTML template
 local templatefile = io.open('./site/_template.html', 'r')
 assert(templatefile, 'No template.html')
----@type string
+--- @type string
 local template = templatefile:read('a')
 templatefile:close()
 
@@ -331,15 +361,33 @@ for pagename, page in pairs(pages) do
 				end
 			end
 
+			if
+				#output == 0
+				and not hasvalue(navlinks, pagename)
+				and not page.unlisted
+				and pagename ~= 'index'
+				and pagename ~= 'directory'
+			then
+				table.insert(orphanedpages, pagename)
+			end
+
 			if #output > 0 then
 				output = '<h2>Backlinks</h2>\n' .. output
 			end
 
 			return output
 		end)
+		:gsub('{{ navigation }}', function() return navigationhtml end)
 
 	file:write(wrappedpagecontents)
 	file:close()
 end
 
 print(string.format("Built in %.0fms", os.clock() * 1000))
+
+if #orphanedpages > 0 then
+	print('Orphaned pages:')
+	for _, pagename in ipairs(orphanedpages) do
+		print('  ' .. pagename)
+	end
+end
