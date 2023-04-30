@@ -247,6 +247,10 @@ local buildpage = function(path)
 		end
 	end
 
+	if prevlinetype == 'table' then
+		output = output .. '</table>'
+	end
+
 	page.body = output
 
 	if page.unlisted then
