@@ -230,7 +230,7 @@ local buildpage = function(path)
 							table.insert(page.links, href)
 						end
 
-						return string.format('<a href="%s.html">%s</a>', href, title)
+						return string.format('<a href="%s">%s</a>', href, title)
 					end)
 
 					-- List
@@ -273,7 +273,7 @@ local buildnavigation = function()
 
 				table.insert(navlinks, href)
 
-				output = output .. string.format('<li><a href="%s.html">%s</a></li>', href, title)
+				output = output .. string.format('<li><a href="%s">%s</a></li>', href, title)
 			else
 				output = output .. string.format('<p>%s</p>', line)
 			end
@@ -327,7 +327,7 @@ pages.directory = {
 
 		for pagename, page in pairs(pages) do
 			if not page.unlisted then
-				output = output .. string.format('<li><a href="%s.html">%s</a></li>\n', pagename, page.title)
+				output = output .. string.format('<li><a href="%s">%s</a></li>\n', pagename, page.title)
 			end
 		end
 
