@@ -361,7 +361,7 @@ for pagename, page in pairs(pages) do
 
 			for otherpagename, otherpage in pairs(pages) do
 				if hasvalue(otherpage.links, pagename) then
-					output = output .. string.format('<li><a href="%s">%s</a></li>\n', otherpagename, otherpage.title)
+					output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', otherpagename, otherpage.title)
 				end
 			end
 
