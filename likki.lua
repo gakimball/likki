@@ -26,6 +26,19 @@ local splitstring = function(input, sep)
 	return fragments
 end
 
+--- Join an ordered table into a string using `sep` as a separator.
+--- @param input string[]
+--- @param sep string
+--- @return string
+local joinstring = function(input, sep)
+	local str = ''
+	for index, item in ipairs(input) do
+		str = str .. item
+		if index < #input then str = str .. sep end
+	end
+	return str
+end
+
 --- Remove leading and trailing whitespace from a string.
 --- @param input string
 local trimstring = function(input)
@@ -304,6 +317,10 @@ local pages = {}
 --- @type string[]
 local orphanedpages = {}
 
+--- Map of pages with broken links.
+--- @type { [string]: string[] }
+local brokenlinks = {}
+
 -- Convert each page from Gemtext to HTML
 for _, filename in pairs(splitstring(filelist, '\n')) do
 	local pagename, page = buildpage(filename)
@@ -343,6 +360,13 @@ for pagename, page in pairs(pages) do
 	local file = io.open(pagepath, 'w')
 
 	assert(file, 'Could not open ' .. pagepath)
+
+	for _, link in ipairs(page.links) do
+		if not pages[link] then
+			if not brokenlinks[pagename] then brokenlinks[pagename] = {} end
+			table.insert(brokenlinks[pagename], link)
+		end
+	end
 
 	local wrappedpagecontents = template
 		:gsub('{{ title }}', function() return page.title end)
@@ -389,9 +413,10 @@ end
 
 print(string.format("Built in %.0fms", os.clock() * 1000))
 
-if #orphanedpages > 0 then
-	print('Orphaned pages:')
-	for _, pagename in ipairs(orphanedpages) do
-		print('  ' .. pagename)
-	end
+for _, pagename in ipairs(orphanedpages) do
+	print('Orphaned page: ' .. pagename)
+end
+
+for pagename, links in pairs(brokenlinks) do
+	print('Broken link: ' .. pagename .. ' => ' .. joinstring(links, ', '))
 end
