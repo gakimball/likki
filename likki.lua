@@ -208,7 +208,7 @@ local buildpage = function(path)
 				if line:match('^##?#?') then
 					prevlinetype = 'heading'
 					local heading = parseheadingline(line)
-					output = output .. line:gsub('^##?#?%s*(.+)', '<h%%s id="%%s">%1</h3>\n'):format(heading.level + 1, heading.slug)
+					output = output .. line:gsub('^##?#?%s*(.+)', '<h%%s id="%%s">%1</h%%s>\n'):format(heading.level + 1, heading.slug, heading.level + 1)
 					table.insert(page.headings, heading)
 					-- Link
 				elseif line:match('^=>') then
@@ -420,3 +420,7 @@ end
 for pagename, links in pairs(brokenlinks) do
 	print('Broken link: ' .. pagename .. ' => ' .. joinstring(links, ', '))
 end
+
+return {
+	buildpage = buildpage,
+}
