@@ -281,8 +281,9 @@ local buildnavigation = function()
 	for line in io.lines('./site/_navigation.txt') do
 		if not line:match('^%s*$') then
 			if line:match('^-') then
-				local title = line:gsub('^-%s+(.*)', '%1')
-				local href = slugifytitle(title)
+				local parsed = splitstring(line:gsub('^-%s+(.*)', '%1'), '|')
+				local href = slugifytitle(parsed[1])
+				local title = parsed[2] or parsed[1]
 
 				table.insert(navlinks, href)
 

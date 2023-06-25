@@ -81,7 +81,7 @@ The infixed spaces are necessary, by the way!
 
 ## Navigation
 
-The file `site/_navigation.txt` holds a template for use as the main site navigation. Each line starting with a hyphen is an internal link; all other lines are section titles.
+The file `site/_navigation.txt` holds a template for use as the main site navigation. Each line starting with a hyphen is an internal link; all other lines are section titles. Like with internal links, the text of the link can be changed by adding a pipe and the link text.
 
 ```
 section 1
@@ -90,8 +90,12 @@ section 1
 
 section 2
 - page 3
-- page 4
+- page 4 | Page four
 ```
+
+## Hidden pages
+
+To hide a page, prefix its filename with an underscore. It will still be built and accessible, but its outgoing links are not tracked, and it's not shown in the directory. The filename of the built page removes the underscore.
 
 ## Backlinks
 
@@ -100,10 +104,6 @@ likki tracks internal links between pages; you can insert a page's backlinks int
 ## Directory
 
 A special page called `/directory` is created automatically, which lists every page in your wiki.
-
-## Hidden pages
-
-To hide a page, prefix its filename with an underscore. It will still be built and accessible, but its outgoing links are not tracked, and it's not shown in the directory. The filename of the built page removes the underscore.
 
 ## License
 
