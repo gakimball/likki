@@ -337,12 +337,17 @@ templatefile:close()
 
 -- Add an index page that lists every page in the wiki
 pages.directory = {
-	title = 'Directory',
+	title = 'directory',
 	unlisted = false,
 	body = (function()
 		local output = ''
+		local sorted_pagenames = {}
+		for pagename in pairs(pages) do table.insert(sorted_pagenames, pagename) end
+		table.sort(sorted_pagenames)
 
-		for pagename, page in pairs(pages) do
+		for _, pagename in ipairs(sorted_pagenames) do
+			local page = pages[pagename]
+
 			if not page.unlisted then
 				output = output .. string.format('<li><a href="%s">%s</a></li>\n', pagename, page.title)
 			end
