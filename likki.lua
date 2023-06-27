@@ -350,7 +350,7 @@ pages.directory = {
 			local page = pages[pagename]
 
 			if not page.unlisted then
-				output = output .. string.format('<li><a href="%s">%s</a></li>\n', pagename, page.title)
+				output = output .. string.format('<p class="link"><a href="%s">%s</a></p>\n', pagename, page.title)
 			end
 		end
 
