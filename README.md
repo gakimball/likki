@@ -90,7 +90,7 @@ section 1
 
 section 2
 - page 3
-- page 4 | Page four
+- page 4|Page four
 ```
 
 ## Hidden pages
