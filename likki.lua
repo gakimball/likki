@@ -215,7 +215,7 @@ local buildpage = function(path)
 					prevlinetype = 'link'
 					local href, text = parseblocklink(line)
 
-					if href:match('%.jpg$') then
+					if href:match('%.jpg') then
 						output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', href, text)
 					else
 						if not href:match('://') and not hasvalue(page.links, href) then
