@@ -429,4 +429,5 @@ end
 
 return {
 	buildpage = buildpage,
+	pages = pages,
 }
