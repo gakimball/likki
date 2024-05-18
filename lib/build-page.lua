@@ -113,6 +113,9 @@ local build_page = function(path)
 
           prevlinetype = 'blockquote'
           output = output .. line:gsub('^>%s*(.+)', '%1\n')
+        -- HTML
+        elseif line:match('^<') then
+          output = output .. line .. '\n'
         -- Remaining possible line types are lists or plain lines, which we parse for {internal links}
         else
           local linkifiedline = line:gsub('%b{}', function(arg)
