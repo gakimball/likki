@@ -1,6 +1,7 @@
 local string_utils = require('likki.lib.string-utils')
 local table_utils = require('likki.lib.table-utils')
 local parsers = require('likki.lib.parsers')
+local create_page_iterator = require('likki.lib.create-page-iterator')
 
 --- @class Heading
 --- @field title string
@@ -22,6 +23,7 @@ local build_page = function(path)
   local filename = path:gsub('^%./site/', '')
   local pagename = filename:gsub('^_', ''):gsub('%.gmi$', '')
   local prevlinetype = nil
+  local iterator, exec_func = create_page_iterator(path)
 
   --- @type Page
   local page = {
@@ -32,7 +34,9 @@ local build_page = function(path)
     links = {},
   }
 
-  for line in io.lines(path) do
+  for line in iterator() do
+    --- @cast line string
+
     -- Preformatted mode
     if line:match('^```') then
       prevlinetype = 'pre'
@@ -96,7 +100,7 @@ local build_page = function(path)
           prevlinetype = 'link'
           local href, text = parsers.block_link(line)
 
-          if href:match('%.jpg') then
+          if string_utils.is_image_path(href) then
             output = output .. string.format('<img src="%s" alt="%s" loading="lazy">', href, text)
           else
             if not href:match('://') and not table_utils.has(page.links, href) then
@@ -116,6 +120,10 @@ local build_page = function(path)
         -- HTML
         elseif line:match('^<') then
           output = output .. line .. '\n'
+        -- Function
+        elseif line:match('^%->') then
+          local funcname = line:sub(4)
+          exec_func(funcname)
         -- Remaining possible line types are lists or plain lines, which we parse for {internal links}
         else
           local linkifiedline = line:gsub('%b{}', function(arg)

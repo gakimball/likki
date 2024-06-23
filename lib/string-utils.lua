@@ -50,10 +50,25 @@ local slugifytitle = function(title)
 	return title:gsub('%s', '-'):lower()
 end
 
+local image_extensions = { 'jpg', 'jpeg', 'png', 'gif', 'webp' }
+
+--- Check if a URL is for an image by checking its extension.
+--- @param path string
+local is_image_path = function(path)
+	for _, ext in ipairs(image_extensions) do
+		if path:match('%.'..ext) then
+			return true
+		end
+	end
+
+	return false
+end
+
 return {
   split = splitstring,
   join = joinstring,
   trim = trimstring,
   escape_html = escapehtml,
 	slugify = slugifytitle,
+	is_image_path = is_image_path,
 }

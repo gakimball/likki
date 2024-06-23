@@ -67,6 +67,36 @@ Last month, I visisted {iceland|a new country}.
 
 Spaces are converted to hyphens to construct the hyperlink.
 
+## Functions
+
+Functions allow you to inject content into a page via an external process.
+
+They're defined as Lua functions at the path `functions/*.lua`. The Lua file should be executable:
+
+```lua
+#!/usr/bin/env lua
+
+-- functions/zombo.lua
+
+io.stdout:write('=> https://html5zombo.com')
+```
+
+Invoke a function with `->`:
+
+```gmi
+Hello world
+
+-> zombo
+```
+
+The output of the process will be inserted into the page:
+
+```gmi
+Hello world
+
+=> https://html5zombo.com
+```
+
 ## Templating
 
 The file `site/_template.html` holds your HTML template. Use these template variables to construct the page:
